@@ -10,10 +10,16 @@ perfixes in peeringDB and therefore the router ocnfig needs to be updated.
 It can also be run 'adhoc' which will generate a table of all peers and display configured max prefixes vs peeringDB
 """
 
+# TODO: command line options to run ad hoc (eg. print table to STDOUT)
+# TODO: when running ad hoc, have option to print full output or just mismatches (right now, print full table)
+# TODO: generate junos set commands to fix mismatch
+
+
 from argparse import ArgumentParser
 import json
 import urllib.request
 from jnpr.junos import Device
+from prettytable import PrettyTable
 
 
 targetrouter = '161.253.191.250'
@@ -50,10 +56,10 @@ def ConfiguredPeers(bgpconfig):
         if 'family' in peer:
             familytype = list(peer['family'][0].keys())[0]
             if familytype == 'inet':
-                maxv4 = peer['family'][0]['inet'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data']
+                maxv4 = int(peer['family'][0]['inet'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data'])
                 extracted4.update({peerAS: maxv4})
             if familytype == 'inet6':
-                maxv6 = peer['family'][0]['inet6'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data']
+                maxv6 = int(peer['family'][0]['inet6'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data'])
                 extracted6.update({peerAS: maxv6})
     return extracted4, extracted4
 
@@ -95,12 +101,36 @@ def GetPeeringDBData(ASNs):
             announcedv6.update({item: max6})
     return announcedv4, announcedv6
 
+def outputTable(cfgMax4, cfgMax6, annc4, annc6):
+    '''
+    create a table to compare results.  two options:
+    full table with all ASNs,
+    table with just those ASNs that have a mismatch between configuration and peeringDB
+    :param cfgMax4: dictionary of v4 ASN: max prefix configured
+    :param cfgMax6: dictionary of v6 ASN: max prefix configured
+    :param annc4: dictionary of v4 ASN: max prefix from peeringDB
+    :param annc6: dictionary of v6 ASN: max prefix from peeringDB
+    :return: none, output table to STDOUT
+    '''
+    fullTable = PrettyTable(['ASN', 'v4config', 'v4pDB', 'v6config', 'v6pDB', 'Mismatch?'])
+    # crate v4 table.  Because the peeringDB list should be a superset of what is configured, use that as the iterator
+    for ASN, prefixes in annc4:
+        # reset mismatch string because we assume that is the norm
+        mismatch = ''
+        if ASN in cfgMax4:
+            if prefix != cfgMax4.get(ASN):
+
+
+
+
+
 
 def main():
     bgpstanza = GetConfig(targetrouter)
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
+    outputTable(configMax4, configMax6, announced4, announced6 )
 
 
 main()
