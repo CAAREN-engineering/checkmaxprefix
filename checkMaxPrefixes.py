@@ -39,11 +39,11 @@ def ConfiguredPeers(bgpconfig):
     take the BGP config in JSON format and extract
     peer name, max v4 prefixes, max v6 prefixes
     :param bgpconfig:
-    :return: two lists of dictionaries (one for each protocol); key=ASN, value=configured max prefixes
+    :return: two  dictionaries (one for each protocol); key=ASN, value=configured max prefixes
     '''
     peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group']
-    extractedList4 = []
-    extractedList6 = []
+    extracted4 = {}
+    extracted6 = {}
     for peer in peerList:
         peerAS = int(peer['peer-as'][0]['data'])
         # check to see if family options are configured and if so, which family we're dealing with
@@ -51,13 +51,11 @@ def ConfiguredPeers(bgpconfig):
             familytype = list(peer['family'][0].keys())[0]
             if familytype == 'inet':
                 maxv4 = peer['family'][0]['inet'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data']
-                peerentry = {peerAS: maxv4}
-                extractedList4.append(peerentry)
+                extracted4.update({peerAS: maxv4})
             if familytype == 'inet6':
                 maxv6 = peer['family'][0]['inet6'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data']
-                peerentry = {peerAS: maxv6}
-                extractedList6.append(peerentry)
-    return extractedList4, extractedList6
+                extracted6.update({peerAS: maxv6})
+    return extracted4, extracted4
 
 
 def GenerateASN(v4, v6):
@@ -83,20 +81,18 @@ def GetPeeringDBData(ASNs):
     Query peeringDB for max prefixes for each configured peer
     this will retrieve both v4 and v6 for each ASN, even if we have only one protocol configured
     :param ASNs: list of ASNs
-    :return: two lists of dictionaries (one for each protocol); key=ASN, value=announced max prefixes
+    :return: two dictionaries (one for each protocol); key=ASN, value=announced max prefixes
     '''
     baseurl = "https://www.peeringdb.com/api/net?asn="
-    announcedv4 = []
-    announcedv6 = []
+    announcedv4 = {}
+    announcedv6 = {}
     for item in ASNs:
         with urllib.request.urlopen(baseurl + item) as raw:
             jresponse = json.loads(raw.read().decode())
             max4 = jresponse['data'][0]['info_prefixes4']
             max6 = jresponse['data'][0]['info_prefixes6']
-            tempdict4 = {item: max4}
-            tempdict6 = {item: max6}
-            announcedv4.append(tempdict4)
-            announcedv6.append(tempdict6)
+            announcedv4.update({item: max4})
+            announcedv6.update({item: max6})
     return announcedv4, announcedv6
 
 
