@@ -11,7 +11,6 @@ It can also be run 'adhoc' which will generate a table of all peers and display 
 """
 
 from argparse import ArgumentParser
-import ipaddress
 import json
 import urllib.request
 from jnpr.junos import Device
@@ -79,9 +78,6 @@ def GenerateASN(v4, v6):
     return ASNs
 
 
-
-
-
 def GetPeeringDBData(ASNs):
     '''
     Query peeringDB for max prefixes for each configured peer
@@ -89,8 +85,19 @@ def GetPeeringDBData(ASNs):
     :param ASNs: list of ASNs
     :return: two lists of dictionaries (one for each protocol); key=ASN, value=announced max prefixes
     '''
-
-
+    baseurl = "https://www.peeringdb.com/api/net?asn="
+    announcedv4 = []
+    announcedv6 = []
+    for item in ASNs:
+        with urllib.request.urlopen(baseurl + item) as raw:
+            jresponse = json.loads(raw.read().decode())
+            max4 = jresponse['data'][0]['info_prefixes4']
+            max6 = jresponse['data'][0]['info_prefixes6']
+            tempdict4 = {item: max4}
+            tempdict6 = {item: max6}
+            announcedv4.append(tempdict4)
+            announcedv6.append(tempdict6)
+    return announcedv4, announcedv6
 
 
 def main():
@@ -98,3 +105,6 @@ def main():
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
+
+
+main()
