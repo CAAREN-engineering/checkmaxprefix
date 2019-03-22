@@ -1,0 +1,102 @@
+# get data from peeringDB
+
+import urllib.request, json
+ASN=11039
+baseurl = "https://www.peeringdb.com/api/net?asn=" + str(ASN)
+
+with urllib.request.urlopen(baseurl) as raw:
+    jresponse = json.loads(raw.read().decode())
+
+	
+# json response format dictionary (2 keys)
+                        list (one entry)
+                            dictionary (multiple keys, info at this level)
+jresponse['data'][0]['info_prefixes4']
+jresponse['data'][0]['info_prefixes6']
+
+
+
+
+
+
+
+
+
+------------------------------------
+for data retrieved from router, construct nested dictionary
+{4901: {'max4': 4444, 'max6': 666}, 11039: {'max4': 444, 'max6': 66}}
+Top level key: ASN
+    value: dictionary with keys 'max4' and 'max6'
+
+
+
+
+------------------------------------
+from jnpr.junos import Device
+from pprint import pprint as pprint
+
+router = '161.253.191.250'
+username = 'netconf'
+path2keyfile = '/home/agallo/.ssh/netconf'
+
+
+with Device(router, user=username, ssh_private_key_file=path2keyfile) as dev:
+    data = dev.rpc.get_config(options={'format':'json'})
+    pprint(data)
+
+the bgp stanza is nested in the config:
+bgpstanza = data['configuration'][0]['protocols'][0]['bgp'][0]
+
+bgpstanza is disctionary with three keys:
+    dict_keys(['group', 'log-updown', 'traceoptions'])
+
+We can access the groups directly:
+    bgppeers = data['configuration'][0]['protocols'][0]['bgp'][0]['group']
+
+    type(bgppeers)
+    list
+
+    len(bgppeers)
+    156
+
+and can iterate over the list:
+for peer in bgppeers:
+    pprint(peer)
+
+each peer is a dictionary with the following keys:
+import
+peer-as
+description
+name
+type
+family
+authentication-key
+neighbor
+export
+
+we are primarily interested in the group name and prefix limit:
+groupname = peer['name']['data']
+max6 = peer['family'][0]['inet6'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data']
+
+Need to figure out a clean way of determining if group is v4 or v6.  Usually group names are a good indication, but this isn't guaranteed
+maybe test neighbor address using 'ip' module to test for isV4 or isV6 (assuming such tests exist)
+
+neighbor address is at:
+address =  peer['neighbor'][0]['name']['data']
+(in the event that there are multiple neighbors in a group, the list index between 'neighbor' and 'name' can be incremented, however
+this isn't useful for this script since we never mix v4 and v6 neighbors in the same stanza
+
+
+In [123]: ipaddress.ip_address(address)
+Out[123]: IPv6Address('2001:504:0:2:0:1:310:2')
+
+In [124]: ipaddress.ip_address(address).version
+Out[124]: 6
+
+--------------------------------------------------------------
+data structure of extracted config is a list of dictionaries
+the dictionary has the following format:
+{ASN: {'max4': 44, 'max6': 66}}
+The key ASN is an integer representing the ASN, since that is guaranteed to be unique
+The value of this key is a dictionary that contains two key-value pairs: max v4 prefixes and max v6 prefixes
+
