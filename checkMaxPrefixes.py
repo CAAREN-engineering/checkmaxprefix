@@ -101,7 +101,8 @@ def GetPeeringDBData(ASNs):
             announcedv6.update({item: max6})
     return announcedv4, announcedv6
 
-def outputTable(cfgMax4, cfgMax6, annc4, annc6):
+
+def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
     '''
     create a table to compare results.  two options:
     full table with all ASNs,
@@ -110,19 +111,57 @@ def outputTable(cfgMax4, cfgMax6, annc4, annc6):
     :param cfgMax6: dictionary of v6 ASN: max prefix configured
     :param annc4: dictionary of v4 ASN: max prefix from peeringDB
     :param annc6: dictionary of v6 ASN: max prefix from peeringDB
-    :return: none, output table to STDOUT
+    :return: v4table, v6table (lists of dictionaries)
     '''
-    fullTable = PrettyTable(['ASN', 'v4config', 'v4pDB', 'v6config', 'v6pDB', 'Mismatch?'])
-    # crate v4 table.  Because the peeringDB list should be a superset of what is configured, use that as the iterator
-    for ASN, prefixes in annc4:
-        # reset mismatch string because we assume that is the norm
-        mismatch = ''
-        if ASN in cfgMax4:
-            if prefix != cfgMax4.get(ASN):
+    v4table = []
+    v6table = []
+    #  Because the peeringDB list should be a superset of what is configured, use that as the iterator
+    for ASN, prefixes in announced4.items():
+        if int(ASN) in configMax4:
+            if prefixes != configMax4[int(ASN)]:
+                v4table.append(
+                    {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+            else:
+                v4table.append(
+                    {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
+    for ASN, prefixes in announced6.items():
+        if int(ASN) in configMax6:
+            if prefixes != configMax6[int(ASN)]:
+                v6table.append(
+                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+            else:
+                v6table.append(
+                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
+
+    return v4table, v6table
 
 
-
-
+def createTable(v4results, v6results, suppress):
+    """
+    Create a pretty table
+    :param v4results (list of dictionaries)
+    :param v6results (list of dictionaries)
+    :param supress (supress entires with no mismatch?  BOOL, 'Y' set default in argparse config()
+    :return: nothing!  print to STDOUT
+    """
+    Tablev4 = PrettyTable(['ASN', 'v4config', 'v4pDB', 'Mismatch?'])
+    Tablev6 = PrettyTable(['ASN', 'v6config', 'v6pDB', 'Mismatch?'])
+    for entry in v4results:
+        if not suppress:
+            Tablev4.add_row([entry['ASN'], entry['configMax4'], entry['prefixes'], entry['mismatch']])
+        elif entry['mismatch'] == "YES":
+            Tablev4.add_row([entry['ASN'], entry['configMax4'], entry['prefixes'], entry['mismatch']])
+    for entry in v6results:
+        if not suppress:
+            Tablev6.add_row([entry['ASN'], entry['configMax6'], entry['prefixes'], entry['mismatch']])
+        elif entry['mismatch'] == "YES":
+            Tablev6.add_row([entry['ASN'], entry['configMax6'], entry['prefixes'], entry['mismatch']])
+    print("v4 results")
+    print(Tablev4)
+    print("\n\n\n")
+    print("v6 results")
+    print(Tablev6)
+    return
 
 
 def main():
@@ -130,7 +169,8 @@ def main():
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
-    outputTable(configMax4, configMax6, announced4, announced6 )
+    v4resutls, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
+    createTable(v4resutls, v6results, suppress)
 
 
 main()
