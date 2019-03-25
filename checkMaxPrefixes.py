@@ -13,6 +13,10 @@ It can also be run 'adhoc' which will generate a table of all peers and display 
 # TODO: command line options to run ad hoc (eg. print table to STDOUT)
 # TODO: when running ad hoc, have option to print full output or just mismatches (right now, print full table)
 # TODO: generate junos set commands to fix mismatch
+#       this will require a change in data structure.  the module that parses the BGP config (ConfiguredPeers)
+#       returns two dictionaries (one for each protocol).  in order to have the group name (needed for set commands),
+#       we need a list of dictionaries, which complicates downstream processing.  maybe save this for when the script
+#       is rewritten with classes?
 
 
 from argparse import ArgumentParser
