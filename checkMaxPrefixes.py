@@ -34,7 +34,8 @@ path2keyfile = '/home/agallo/.ssh/netconf'
 def GetConfig(router):
     '''
     retrieve config from router.
-    filter to retrieve only BGP stanza
+    filter to retrieve only BGP stanza (though that doesn't appear to work since ConfiguredPeers requires the full
+    config path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
     retrieve in json, because it's much easier than XML
     :param router:
     :return: bgpstanza
@@ -47,7 +48,8 @@ def GetConfig(router):
 def ConfiguredPeers(bgpconfig):
     '''
     take the BGP config in JSON format and extract
-    peer name, max v4 prefixes, max v6 prefixes
+    peer AS, max v4 prefixes, max v6 prefixes
+    AS is both authoritative an unique and is used as a key to search peeringDB
     :param bgpconfig:
     :return: two  dictionaries (one for each protocol); key=ASN, value=configured max prefixes
     '''
@@ -108,9 +110,7 @@ def GetPeeringDBData(ASNs):
 
 def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
     '''
-    create a table to compare results.  two options:
-    full table with all ASNs,
-    table with just those ASNs that have a mismatch between configuration and peeringDB
+    compare data from peeringDB & what is configured; note mismatches
     :param cfgMax4: dictionary of v4 ASN: max prefix configured
     :param cfgMax6: dictionary of v6 ASN: max prefix configured
     :param annc4: dictionary of v4 ASN: max prefix from peeringDB
@@ -145,7 +145,7 @@ def createTable(v4results, v6results, suppress):
     Create a pretty table
     :param v4results (list of dictionaries)
     :param v6results (list of dictionaries)
-    :param supress (supress entires with no mismatch?  BOOL, 'Y' set default in argparse config()
+    :param supress (supress entires with no mismatch?  BOOL, True set default in argparse config()
     :return: nothing!  print to STDOUT
     """
     Tablev4 = PrettyTable(['ASN', 'v4config', 'v4pDB', 'Mismatch?'])
