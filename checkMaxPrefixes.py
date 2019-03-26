@@ -10,7 +10,6 @@ perfixes in peeringDB and therefore the router ocnfig needs to be updated.
 It can also be run 'adhoc' which will generate a table of all peers and display configured max prefixes vs peeringDB
 """
 
-# TODO: command line options to run ad hoc (eg. print table to STDOUT)
 # TODO: when running ad hoc, have option to print full output or just mismatches (right now, print full table)
 # TODO: generate junos set commands to fix mismatch
 #       this will require a change in data structure.  the module that parses the BGP config (ConfiguredPeers)
@@ -25,6 +24,18 @@ import urllib.request
 from jnpr.junos import Device
 from prettytable import PrettyTable
 
+parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
+
+parser.add_argument("-s", "--suppress", dest='suppress', action='store_true',
+                    help="suppress entries where config matches PDB (default is to suppress)")
+
+parser.add_argument("-a", "--adhoc", dest='adhoc', action='store_true',
+                    help="run in ad hoc mode (output tables to STDOUT)")
+
+args = parser.parse_args()
+
+suppress = args.suppress
+adhoc = args.adhoc
 
 targetrouter = '161.253.191.250'
 username = 'netconf'
@@ -214,7 +225,9 @@ def main():
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
     v4results, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
-    createTable(v4results, v6results, suppress)
+    if not adhoc:
+        createTable(v4results, v6results, suppress)
     commands4, commands6 = generateSetCommands(v4results, v6results, bgpstanza)
+
 
 main()
