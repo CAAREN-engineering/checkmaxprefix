@@ -10,13 +10,6 @@ perfixes in peeringDB and therefore the router ocnfig needs to be updated.
 It can also be run 'adhoc' which will generate a table of all peers and display configured max prefixes vs peeringDB
 """
 
-# TODO: when running ad hoc, have option to print full output or just mismatches (right now, print full table)
-# TODO: generate junos set commands to fix mismatch
-#       this will require a change in data structure.  the module that parses the BGP config (ConfiguredPeers)
-#       returns two dictionaries (one for each protocol).  in order to have the group name (needed for set commands),
-#       we need a list of dictionaries, which complicates downstream processing.  maybe save this for when the script
-#       is rewritten with classes?
-
 
 from argparse import ArgumentParser
 import json
@@ -46,21 +39,21 @@ def GetConfig(router):
     '''
     retrieve config from router.
     filter to retrieve only BGP stanza (though that doesn't appear to work since ConfiguredPeers requires the full
-    config path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
+    path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
     retrieve in json, because it's much easier than XML
     :param router:
     :return: bgpstanza
     '''
     with Device(router, user=username, ssh_private_key_file=path2keyfile) as dev:
-        a = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
-    return a
+        config = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
+    return config
 
 
 def ConfiguredPeers(bgpconfig):
     '''
     take the BGP config in JSON format and extract
     peer AS, max v4 prefixes, max v6 prefixes
-    AS is both authoritative an unique and is used as a key to search peeringDB
+    ASN is both authoritative an unique and is used as a key to search peeringDB
     :param bgpconfig:
     :return: two  dictionaries (one for each protocol); key=ASN, value=configured max prefixes
     '''
@@ -70,6 +63,7 @@ def ConfiguredPeers(bgpconfig):
     for peer in peerList:
         peerAS = int(peer['peer-as'][0]['data'])
         # check to see if family options are configured and if so, which family we're dealing with
+        # if no family is configured, then the peer does not have any max prefix set
         if 'family' in peer:
             familytype = list(peer['family'][0].keys())[0]
             if familytype == 'inet':
@@ -190,7 +184,7 @@ def generateSetCommands(v4results, v6results, bgpstanza):
     :param v4results:
     :param v6results:
     :param bgpstanza:
-    :return: a list of commands
+    :return: nothing- write commands to file
     """
     v4commands = []
     v6commands = []
@@ -216,7 +210,10 @@ def generateSetCommands(v4results, v6results, bgpstanza):
                             command = "set protocols bgp group {} family inet6 unicast prefix-limit maximum {}".format(
                                 groupname, newpfxlimit)
                             v6commands.append(command)
-    return v4commands, v6commands
+    with open('v4commands.txt', 'w') as f:
+        f.write('\n'.join(v4commands))
+    with open('v6commands.txt', 'w') as f:
+        f.write('\n'.join(v6commands))
 
 
 def main():
@@ -227,7 +224,7 @@ def main():
     v4results, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
     if not adhoc:
         createTable(v4results, v6results, suppress)
-    commands4, commands6 = generateSetCommands(v4results, v6results, bgpstanza)
+    generateSetCommands(v4results, v6results, bgpstanza)
 
 
 main()
