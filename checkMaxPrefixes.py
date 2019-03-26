@@ -197,7 +197,7 @@ def generateSetCommands(v4results, v6results, bgpstanza):
                         if item['ASN'] == int(group['peer-as'][0]['data']) and list(group['family'][0].keys())[0] == 'inet6':
                             groupname = group['name']['data']
                             newpfxlimit = item['prefixes']
-                            command = "set protocols bgp group {} family inet unicast prefix-limit maximum {}".format(
+                            command = "set protocols bgp group {} family inet6 unicast prefix-limit maximum {}".format(
                                 groupname, newpfxlimit)
                             v6commands.append(command)
     return v4commands, v6commands
