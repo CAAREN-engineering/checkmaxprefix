@@ -80,11 +80,11 @@ def GenerateASN(v4, v6):
     '''
     ASNs = []
     for item in v4:
-        ASNs.append(str(list(item.keys())[0]))
+        ASNs.append(item)
     for item in v6:
-        if str(list(item.keys())[0]) not in ASNs:
-            ASNs.append(str(list(item.keys())[0]))
-    ASNs.sort(key=int)
+        if item not in ASNs:
+            ASNs.append(item)
+    ASNs.sort()
     return ASNs
 
 
@@ -99,7 +99,7 @@ def GetPeeringDBData(ASNs):
     announcedv4 = {}
     announcedv6 = {}
     for item in ASNs:
-        with urllib.request.urlopen(baseurl + item) as raw:
+        with urllib.request.urlopen(baseurl + str(item)) as raw:
             jresponse = json.loads(raw.read().decode())
             max4 = jresponse['data'][0]['info_prefixes4']
             max6 = jresponse['data'][0]['info_prefixes6']
@@ -173,8 +173,8 @@ def main():
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
-    v4resutls, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
-    createTable(v4resutls, v6results, suppress)
+    v4results, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
+    createTable(v4results, v6results, suppress)
 
 
 main()
