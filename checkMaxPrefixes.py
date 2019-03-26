@@ -168,6 +168,41 @@ def createTable(v4results, v6results, suppress):
     return
 
 
+def generateSetCommands(v4results, v6results, bgpstanza):
+    """
+    generate the Junos set commands necessary to update config to match what is in peeringDB
+    :param v4results:
+    :param v6results:
+    :param bgpstanza:
+    :return: a list of commands
+    """
+    v4commands = []
+    v6commands = []
+    for item in v4results:
+        if item['mismatch'] == 'YES':
+            for group in bgpstanza['configuration'][0]['protocols'][0]['bgp'][0]['group']:
+                if 'family' in group:
+                    if 'inet' in group['family'][0]:
+                        if item['ASN'] == int(group['peer-as'][0]['data']) and list(group['family'][0].keys())[0] == 'inet':
+                            groupname = group['name']['data']
+                            newpfxlimit = item['prefixes']
+                            command = "set protocols bgp group {} family inet unicast prefix-limit maximum {}".format(
+                                groupname, newpfxlimit)
+                            v4commands.append(command)
+    for item in v6results:
+        if item['mismatch'] == 'YES':
+            for group in bgpstanza['configuration'][0]['protocols'][0]['bgp'][0]['group']:
+                if 'family' in group:
+                    if 'inet6' in group['family'][0]:
+                        if item['ASN'] == int(group['peer-as'][0]['data']) and list(group['family'][0].keys())[0] == 'inet6':
+                            groupname = group['name']['data']
+                            newpfxlimit = item['prefixes']
+                            command = "set protocols bgp group {} family inet unicast prefix-limit maximum {}".format(
+                                groupname, newpfxlimit)
+                            v6commands.append(command)
+    return v4commands, v6commands
+
+
 def main():
     bgpstanza = GetConfig(targetrouter)
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
@@ -175,6 +210,6 @@ def main():
     announced4, announced6 = GetPeeringDBData(ASNlist)
     v4results, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
     createTable(v4results, v6results, suppress)
-
+    commands4, commands6 = generateSetCommands(v4results, v6results, bgpstanza)
 
 main()
