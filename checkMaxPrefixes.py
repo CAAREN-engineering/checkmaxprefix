@@ -67,7 +67,7 @@ def ConfiguredPeers(bgpconfig):
             if familytype == 'inet6':
                 maxv6 = int(peer['family'][0]['inet6'][0]['unicast'][0]['prefix-limit'][0]['maximum'][0]['data'])
                 extracted6.update({peerAS: maxv6})
-    return extracted4, extracted4
+    return extracted4, extracted6
 
 
 def GenerateASN(v4, v6):
@@ -122,7 +122,9 @@ def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
     #  Because the peeringDB list should be a superset of what is configured, use that as the iterator
     for ASN, prefixes in announced4.items():
         if int(ASN) in configMax4:
-            if prefixes != configMax4[int(ASN)]:
+            if prefixes == 0:               # some networks don't list anything on pDB
+                v4table.append({'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
+            elif prefixes != configMax4[int(ASN)]:
                 v4table.append(
                     {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
             else:
@@ -130,7 +132,10 @@ def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
                     {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
     for ASN, prefixes in announced6.items():
         if int(ASN) in configMax6:
-            if prefixes != configMax6[int(ASN)]:
+            if prefixes == 0:               # some networks don't list anything on pDB
+                v6table.append(
+                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
+            elif prefixes != configMax6[int(ASN)]:
                 v6table.append(
                     {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
             else:
