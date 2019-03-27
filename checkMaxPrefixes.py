@@ -185,6 +185,7 @@ def createTable(v4results, v6results, suppress):
 def generateSetCommands(v4results, v6results, bgpstanza):
     """
     generate the Junos set commands necessary to update config to match what is in peeringDB
+    because configuration is based on group name, we need to access 'bgpstanza' again
     :param v4results:
     :param v6results:
     :param bgpstanza:
