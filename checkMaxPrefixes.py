@@ -10,12 +10,12 @@ perfixes in peeringDB and therefore the router ocnfig needs to be updated.
 It can also be run 'adhoc' which will generate a table of all peers and display configured max prefixes vs peeringDB
 """
 
-
 from argparse import ArgumentParser
 import json
 import urllib.request
 from jnpr.junos import Device
 from prettytable import PrettyTable
+
 
 parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
 
@@ -30,33 +30,34 @@ args = parser.parse_args()
 suppress = args.suppress
 adhoc = args.adhoc
 
+
 targetrouter = '161.253.191.250'
 username = 'netconf'
 path2keyfile = '/home/agallo/.ssh/netconf'
 
 
 def GetConfig(router):
-    '''
+    """
     retrieve config from router.
     filter to retrieve only BGP stanza (though that doesn't appear to work since ConfiguredPeers requires the full
     path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
     retrieve in json, because it's much easier than XML
     :param router:
     :return: bgpstanza
-    '''
+    """
     with Device(router, user=username, ssh_private_key_file=path2keyfile) as dev:
         config = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
     return config
 
 
 def ConfiguredPeers(bgpconfig):
-    '''
+    """
     take the BGP config in JSON format and extract
     peer AS, max v4 prefixes, max v6 prefixes
     ASN is both authoritative an unique and is used as a key to search peeringDB
     :param bgpconfig:
     :return: two  dictionaries (one for each protocol); key=ASN, value=configured max prefixes
-    '''
+    """
     peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group']
     extracted4 = {}
     extracted6 = {}
@@ -76,13 +77,13 @@ def ConfiguredPeers(bgpconfig):
 
 
 def GenerateASN(v4, v6):
-    '''
+    """
     generate a simple master list of all ASNs configured on that router.  This single list will have both
     v4 and v6 peers.  It will be used to query peeringDB
     :param v4: the list of dictionaries of configured v4 prefix limits
     :param v6: the list of dictionaries of configured v4 prefix limits
     :return: ASNs
-    '''
+    """
     ASNs = []
     for item in v4:
         ASNs.append(item)
@@ -94,12 +95,12 @@ def GenerateASN(v4, v6):
 
 
 def GetPeeringDBData(ASNs):
-    '''
+    """
     Query peeringDB for max prefixes for each configured peer
     this will retrieve both v4 and v6 for each ASN, even if we have only one protocol configured
     :param ASNs: list of ASNs
     :return: two dictionaries (one for each protocol); key=ASN, value=announced max prefixes
-    '''
+    """
     baseurl = "https://www.peeringdb.com/api/net?asn="
     announcedv4 = {}
     announcedv6 = {}
@@ -114,38 +115,38 @@ def GetPeeringDBData(ASNs):
 
 
 def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
-    '''
+    """
     compare data from peeringDB & what is configured; note mismatches
     :param cfgMax4: dictionary of v4 ASN: max prefix configured
     :param cfgMax6: dictionary of v6 ASN: max prefix configured
     :param annc4: dictionary of v4 ASN: max prefix from peeringDB
     :param annc6: dictionary of v6 ASN: max prefix from peeringDB
     :return: v4table, v6table (lists of dictionaries)
-    '''
+    """
     v4table = []
     v6table = []
     #  Because the peeringDB list should be a superset of what is configured, use that as the iterator
-    for ASN, prefixes in announced4.items():
-        if int(ASN) in configMax4:
-            if prefixes == 0:               # some networks don't list anything on pDB
-                v4table.append({'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
-            elif prefixes != configMax4[int(ASN)]:
+    for ASN, prefixes in annc4.items():
+        if int(ASN) in cfgMax4:
+            if prefixes == 0:               # some networks don't list anything on pDB, so skip them
+                v4table.append({'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
+            elif prefixes != cfgMax4[int(ASN)]:
                 v4table.append(
-                    {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+                    {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
             else:
                 v4table.append(
-                    {'ASN': ASN, 'configMax4': configMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
-    for ASN, prefixes in announced6.items():
-        if int(ASN) in configMax6:
-            if prefixes == 0:               # some networks don't list anything on pDB
+                    {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
+    for ASN, prefixes in annc6.items():
+        if int(ASN) in cfgMax6:
+            if prefixes == 0:               # some networks don't list anything on pDB, so skip them
                 v6table.append(
-                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
-            elif prefixes != configMax6[int(ASN)]:
+                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
+            elif prefixes != cfgMax6[int(ASN)]:
                 v6table.append(
-                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
             else:
                 v6table.append(
-                    {'ASN': ASN, 'configMax6': configMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
+                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
 
     return v4table, v6table
 
@@ -155,7 +156,7 @@ def createTable(v4results, v6results, suppress):
     Create a pretty table
     :param v4results (list of dictionaries)
     :param v6results (list of dictionaries)
-    :param supress (supress entires with no mismatch?  BOOL, True set default in argparse config()
+    :param suppress (suppress entries with no mismatch?  BOOL, True set default in argparse config)
     :return: nothing!  print to STDOUT
     """
     Tablev4 = PrettyTable(['ASN', 'v4config', 'v4pDB', 'Mismatch?'])
