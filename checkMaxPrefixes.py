@@ -18,10 +18,10 @@ from prettytable import PrettyTable
 
 parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
 
-parser.add_argument("-s", "--suppress", dest='suppress', action='store_true',
-                    help="suppress entries when config matches PDB. only useful in ad hoc mode(default is to suppress)")
 parser.add_argument("-a", "--adhoc", dest='adhoc', action='store_true',
                     help="run in ad hoc mode (output tables to STDOUT)")
+parser.add_argument("-s", "--suppress", dest='suppress', action='store_true',
+                    help="suppress entries when config matches PDB. only useful in ad hoc mode(default is to suppress)")
 parser.set_defaults(suppress=True)
 parser.set_defaults(adhoc=True)
 
