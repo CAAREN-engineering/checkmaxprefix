@@ -105,3 +105,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# local stuff to ignore
+!notes.txt
+.notes.txt
+v4commands.txt
+v6commands.txt
