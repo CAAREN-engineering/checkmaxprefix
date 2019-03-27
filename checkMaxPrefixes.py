@@ -1,11 +1,10 @@
 #!/usr/bin/python3
 
 """
-This script checks the configured max prefixes for a bgp peer on a juniper router and checks it against what is
-in peeringDB.
+This script checks the configured max prefixes for a bgp peer on a juniper router and compares it to what is in peeringDB.
 
-It is intended to run via cron and generate some output (email or something else) to indicate when a peer updates max
-perfixes in peeringDB and therefore the router ocnfig needs to be updated.
+It is intended to run via cron and generate some output, currently, two files (one per protocol family) of Junos
+set commands to update the router with new max prefixes.
 
 It can also be run 'adhoc' which will generate a table of all peers and display configured max prefixes vs peeringDB
 """
@@ -20,7 +19,7 @@ from prettytable import PrettyTable
 parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
 
 parser.add_argument("-s", "--suppress", dest='suppress', action='store_true',
-                    help="suppress entries where config matches PDB (default is to suppress)")
+                    help="suppress entries when config matches PDB. only useful in ad hoc mode(default is to suppress)")
 
 parser.add_argument("-a", "--adhoc", dest='adhoc', action='store_true',
                     help="run in ad hoc mode (output tables to STDOUT)")
@@ -30,10 +29,12 @@ args = parser.parse_args()
 suppress = args.suppress
 adhoc = args.adhoc
 
-
+# ************************************* #
+# update this section with router info  #
 targetrouter = '161.253.191.250'
 username = 'netconf'
 path2keyfile = '/home/agallo/.ssh/netconf'
+# ************************************* #
 
 
 def GetConfig(router):
@@ -43,7 +44,7 @@ def GetConfig(router):
     path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
     retrieve in json, because it's much easier than XML
     :param router:
-    :return: bgpstanza
+    :return: config
     """
     with Device(router, user=username, ssh_private_key_file=path2keyfile) as dev:
         config = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
@@ -64,7 +65,7 @@ def ConfiguredPeers(bgpconfig):
     for peer in peerList:
         peerAS = int(peer['peer-as'][0]['data'])
         # check to see if family options are configured and if so, which family we're dealing with
-        # if no family is configured, then the peer does not have any max prefix set
+        # if no family is configured, then the peer does not have any max prefix set, so skip it
         if 'family' in peer:
             familytype = list(peer['family'][0].keys())[0]
             if familytype == 'inet':
@@ -79,7 +80,8 @@ def ConfiguredPeers(bgpconfig):
 def GenerateASN(v4, v6):
     """
     generate a simple master list of all ASNs configured on that router.  This single list will have both
-    v4 and v6 peers.  It will be used to query peeringDB
+    v4 and v6 peers.  It will be used to query peeringDB.  we could have maintained a list per protocol, but that would
+    result in querying peeringDB twice if we had a peer with both protocols configured- unnecessary load
     :param v4: the list of dictionaries of configured v4 prefix limits
     :param v6: the list of dictionaries of configured v4 prefix limits
     :return: ASNs
