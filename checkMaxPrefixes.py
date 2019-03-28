@@ -12,8 +12,9 @@ It can also be run 'adhoc' which will generate a table of all peers and display 
 from argparse import ArgumentParser
 import json
 import urllib.request
-from jnpr.junos import Device
 from prettytable import PrettyTable
+from sys import exit
+from jnpr.junos import Device
 
 
 parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
@@ -30,15 +31,8 @@ args = parser.parse_args()
 suppress = args.suppress
 adhoc = args.adhoc
 
-# ***************************************
-# update this section with router info***
-targetrouter = '161.253.191.250'
-username = 'netconf'
-path2keyfile = '/home/agallo/.ssh/netconf'
-# ***************************************
 
-
-def GetConfig(router):
+def GetConfig():
     """
     retrieve config from router.
     filter to retrieve only BGP stanza (though that doesn't appear to work since ConfiguredPeers requires the full
@@ -47,7 +41,15 @@ def GetConfig(router):
     :param router:
     :return: config
     """
-    with Device(router, user=username, ssh_private_key_file=path2keyfile) as dev:
+    # ***************************************
+    # update this section with router info***
+    targetrouter = 'NOTSET'
+    username = 'NOTSET'
+    path2keyfile = 'NOTSET'
+    # ***************************************
+    if targetrouter == 'NOTSET' or username == 'NOTSET' or path2keyfile == 'notset':
+        exit("router info not set.  please edit script to enter router ip/username/private key")
+    with Device(targetrouter, user=username, ssh_private_key_file=path2keyfile) as dev:
         config = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
     return config
 
@@ -221,7 +223,7 @@ def generateSetCommands(v4results, v6results, bgpstanza):
 
 
 def main():
-    bgpstanza = GetConfig(targetrouter)
+    bgpstanza = GetConfig()
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
