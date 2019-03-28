@@ -128,7 +128,6 @@ def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
     """
     v4table = []
     v6table = []
-    #  Because the peeringDB list should be a superset of what is configured, use that as the iterator
     for ASN, prefixes in annc4.items():
         if int(ASN) in cfgMax4:
             if prefixes == 0:               # some networks don't list anything on pDB, so skip them
