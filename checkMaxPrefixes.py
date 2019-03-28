@@ -30,12 +30,12 @@ args = parser.parse_args()
 suppress = args.suppress
 adhoc = args.adhoc
 
-# ************************************* #
-# update this section with router info  #
+# ***************************************
+# update this section with router info***
 targetrouter = '161.253.191.250'
 username = 'netconf'
 path2keyfile = '/home/agallo/.ssh/netconf'
-# ************************************* #
+# ***************************************
 
 
 def GetConfig(router):
@@ -110,10 +110,10 @@ def GetPeeringDBData(ASNs):
     for item in ASNs:
         with urllib.request.urlopen(baseurl + str(item)) as raw:
             jresponse = json.loads(raw.read().decode())
-            max4 = jresponse['data'][0]['info_prefixes4']
-            max6 = jresponse['data'][0]['info_prefixes6']
-            announcedv4.update({item: max4})
-            announcedv6.update({item: max6})
+        max4 = jresponse['data'][0]['info_prefixes4']
+        max6 = jresponse['data'][0]['info_prefixes6']
+        announcedv4.update({item: max4})
+        announcedv6.update({item: max6})
     return announcedv4, announcedv6
 
 
