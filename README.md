@@ -7,9 +7,10 @@ It can also be run ad hoc which will generate a table of all peers and display c
 
 Requirements:
  1. Juniper PyEz module
- 1. netconf private key
+ 1. router with netconf over ssh enabled
+ 1. user needs read privileges to the configuration
 
-** You will need to edit the script to enter the router IP and credentials:
+_You will need to edit the script to enter the router IP and credentials in function `GetConfig`:_
 
 ```
 # ***************************************
@@ -18,5 +19,4 @@ targetrouter = 'NOTSET'
 username = 'NOTSET'
 path2keyfile = 'NOTSET'
 # ***************************************
-
 
