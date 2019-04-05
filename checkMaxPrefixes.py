@@ -24,7 +24,7 @@ parser.add_argument("-a", "--adhoc", dest='adhoc', action='store_true',
 parser.add_argument("-s", "--suppress", dest='suppress', action='store_true',
                     help="suppress entries when config matches PDB. only useful in ad hoc mode(default is to suppress)")
 parser.set_defaults(suppress=True)
-parser.set_defaults(adhoc=True)
+parser.set_defaults(adhoc=False)
 
 args = parser.parse_args()
 
@@ -228,7 +228,7 @@ def main():
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
     v4results, v6results = findMismatch(configMax4, configMax6, announced4, announced6)
-    if not adhoc:
+    if adhoc:
         createTable(v4results, v6results, suppress)
     generateSetCommands(v4results, v6results, bgpstanza)
 
