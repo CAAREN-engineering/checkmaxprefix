@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+
 
 """
 This script checks the configured max prefixes for a bgp peer on a juniper router and compares it to what is in peeringDB.
@@ -15,6 +16,7 @@ import urllib.request
 from prettytable import PrettyTable
 from sys import exit
 from jnpr.junos import Device
+from creds import rtrdict, username, path2keyfile
 
 
 parser = ArgumentParser(description="Compare configured max prefixes with what is listed in PeeringDB")
@@ -32,23 +34,22 @@ suppress = args.suppress
 adhoc = args.adhoc
 
 
-def GetConfig():
+def GetConfig(routers, username, path2keyfile):
     """
     retrieve config from router.
     filter to retrieve only BGP stanza (though that doesn't appear to work since ConfiguredPeers requires the full
     path to the group (peerList = bgpconfig['configuration'][0]['protocols'][0]['bgp'][0]['group'])
     retrieve in json, because it's much easier than XML
-    :param router:
+    ***currently, this works for a single router.  there is no logic to loop through multiple entries in the rtrdict
+    :param routers: dictionary of routers to check
+    :param username: username with at least RO privs
+    :param path2keyfile: ssh private key
     :return: config
     """
-    # ***************************************
-    # update this section with router info***
-    targetrouter = 'NOTSET'
-    username = 'NOTSET'
-    path2keyfile = 'NOTSET'
-    # ***************************************
-    if targetrouter == 'NOTSET' or username == 'NOTSET' or path2keyfile == 'notset':
-        exit("router info not set.  please edit script to enter router ip/username/private key")
+    [(k, v)] = routers.items()
+    if k == "MyAwesomeRouter" or v == 'IPaddr':
+        exit("You need to edit creds.py with real values for the target router (rtrdict)")
+    targetrouter = v
     with Device(targetrouter, user=username, ssh_private_key_file=path2keyfile) as dev:
         config = dev.rpc.get_config(filter_xml='protocols/bgp', options={'format': 'json'})
     return config
@@ -134,9 +135,12 @@ def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
         if int(ASN) in cfgMax4:
             if prefixes == 0:               # some networks don't list anything on pDB, so skip them
                 v4table.append({'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
-            elif prefixes != cfgMax4[int(ASN)]:
+            elif prefixes > cfgMax4[int(ASN)]:
                 v4table.append(
-                    {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+                    {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES - reconfig'})
+            elif prefixes < cfgMax4[int(ASN)]:
+                v4table.append(
+                    {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES - exception'})
             else:
                 v4table.append(
                     {'ASN': ASN, 'configMax4': cfgMax4[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
@@ -145,9 +149,12 @@ def findMismatch(cfgMax4, cfgMax6, annc4, annc6):
             if prefixes == 0:               # some networks don't list anything on pDB, so skip them
                 v6table.append(
                     {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'n/a'})
-            elif prefixes != cfgMax6[int(ASN)]:
+            elif prefixes > cfgMax6[int(ASN)]:
                 v6table.append(
-                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES'})
+                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES - reconfig'})
+            elif prefixes < cfgMax6[int(ASN)]:
+                v6table.append(
+                    {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': 'YES - exception'})
             else:
                 v6table.append(
                     {'ASN': ASN, 'configMax6': cfgMax6[int(ASN)], 'prefixes': prefixes, 'mismatch': ''})
@@ -165,21 +172,39 @@ def createTable(v4results, v6results, suppress):
     """
     Tablev4 = PrettyTable(['ASN', 'v4config', 'v4pDB', 'Mismatch?'])
     Tablev6 = PrettyTable(['ASN', 'v6config', 'v6pDB', 'Mismatch?'])
+    exceptionv4 = PrettyTable(['ASN', 'v4config', 'v4pDB'])
+    exceptionv6 = PrettyTable(['ASN', 'v6config', 'v6pDB'])
+    exceptionv4.print_empty = False
+    exceptionv6.print_empty = False
+    exceptionExists = False
     for entry in v4results:
         if not suppress:
             Tablev4.add_row([entry['ASN'], entry['configMax4'], entry['prefixes'], entry['mismatch']])
-        elif entry['mismatch'] == "YES":
+        elif entry['mismatch'] == "YES - reconfig":
             Tablev4.add_row([entry['ASN'], entry['configMax4'], entry['prefixes'], entry['mismatch']])
+        elif entry['mismatch'] == "YES - exception":
+            exceptionv4.add_row([entry['ASN'], entry['configMax4'], entry['prefixes']])
+            exceptionExists = True
     for entry in v6results:
         if not suppress:
             Tablev6.add_row([entry['ASN'], entry['configMax6'], entry['prefixes'], entry['mismatch']])
-        elif entry['mismatch'] == "YES":
+        elif entry['mismatch'] == "YES - reconfig":
             Tablev6.add_row([entry['ASN'], entry['configMax6'], entry['prefixes'], entry['mismatch']])
+        elif entry['mismatch'] == "YES - exception":
+            exceptionv6.add_row([entry['ASN'], entry['configMax6'], entry['prefixes']])
+            exceptionExists = True
     print("v4 results")
     print(Tablev4)
     print("\n\n\n")
     print("v6 results")
     print(Tablev6)
+    if exceptionExists:
+        print("\n\n\n")
+        print("The following networks are advertising more prefixes than listed in PeeringDB.")
+        print("We have manually configured the router to the following values.")
+        print(exceptionv4)
+        print("\n")
+        print(exceptionv6)
     return
 
 
@@ -195,7 +220,7 @@ def generateSetCommands(v4results, v6results, bgpstanza):
     v4commands = []
     v6commands = []
     for item in v4results:
-        if item['mismatch'] == 'YES':
+        if item['mismatch'] == 'YES - reconfig':
             for group in bgpstanza['configuration'][0]['protocols'][0]['bgp'][0]['group']:
                 if 'family' in group:
                     if 'inet' in group['family'][0]:
@@ -206,7 +231,7 @@ def generateSetCommands(v4results, v6results, bgpstanza):
                                 groupname, newpfxlimit)
                             v4commands.append(command)
     for item in v6results:
-        if item['mismatch'] == 'YES':
+        if item['mismatch'] == 'YES - reconfig':
             for group in bgpstanza['configuration'][0]['protocols'][0]['bgp'][0]['group']:
                 if 'family' in group:
                     if 'inet6' in group['family'][0]:
@@ -216,14 +241,18 @@ def generateSetCommands(v4results, v6results, bgpstanza):
                             command = "set protocols bgp group {} family inet6 unicast prefix-limit maximum {}".format(
                                 groupname, newpfxlimit)
                             v6commands.append(command)
-    with open('v4commands.txt', 'w') as f:
-        f.write('\n'.join(v4commands))
-    with open('v6commands.txt', 'w') as f:
-        f.write('\n'.join(v6commands))
+    if len(v4commands) > 0:
+        with open('v4commands.txt', 'w') as f:
+            f.write('\n'.join(v4commands))
+            print("changes to v4 peers.  see v4commands.txt")
+    if len(v6commands) > 0:
+        with open('v6commands.txt', 'w') as f:
+            f.write('\n'.join(v6commands))
+            print("changes to v6 peers.  see v6commands.txt")
 
 
 def main():
-    bgpstanza = GetConfig()
+    bgpstanza = GetConfig(rtrdict, username, path2keyfile)
     configMax4, configMax6 = ConfiguredPeers(bgpstanza)
     ASNlist = GenerateASN(configMax4, configMax6)
     announced4, announced6 = GetPeeringDBData(ASNlist)
