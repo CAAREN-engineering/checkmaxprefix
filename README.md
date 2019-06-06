@@ -9,14 +9,11 @@ Requirements:
  1. Juniper PyEz module
  1. router with netconf over ssh enabled
  1. user needs read privileges to the configuration
+ 1. a file (creds.py) which contains
+     1. rtrdict (a dictionary of routers to check)**
+     1. username
+     1. path to the private key used to authenticate
 
-_You will need to edit the script to enter the router IP and credentials in function `GetConfig`:_
+See creds.py-EXAMPLE for the format.
 
-```
-# ***************************************
-# update this section with router info***
-targetrouter = 'NOTSET'
-username = 'NOTSET'
-path2keyfile = 'NOTSET'
-# ***************************************
-
+_currently, this script will check only one router_.  It is best that the rtrdict in creds.py be a dictionary of a single router
