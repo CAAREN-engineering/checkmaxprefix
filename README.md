@@ -16,4 +16,4 @@ Requirements:
 
 See creds.py-EXAMPLE for the format.
 
-_currently, this script will check only one router_.  It is best that the rtrdict in creds.py be a dictionary of a single router
+** _currently, this script will check only one router_.  It is best that the rtrdict in creds.py be a dictionary of a single router
